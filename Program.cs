@@ -7,12 +7,23 @@ using System.Threading.Tasks;
 using ACSharp;
 using ACSharp.ResourceTypes;
 using System.IO;
+using Force.Crc32;
 
 namespace ACSharpTests {
 	class Program {
 		static void Main(string[] args) {
-			Forge f = new Forge(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II\DataPC_Toscana.forge", Games.AC2);
-			Console.WriteLine(f.datafileTable[0].name);
+
+			byte[] hashbytes = Encoding.ASCII.GetBytes("GridCellDataBlock");
+			uint hash = Crc32Algorithm.Compute(hashbytes, 0, hashbytes.Length);
+			Console.WriteLine(hash);
+
+			hashbytes = Encoding.ASCII.GetBytes("DataBlock");
+			hash = Crc32Algorithm.Compute(hashbytes, 0, hashbytes.Length);
+			Console.WriteLine(hash);
+
+			//AC2FileTypeTest();
+			//Forge f = new Forge(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II\DataPC_Toscana.forge", Games.AC2);
+			//Console.WriteLine(f.datafileTable[0].name);
 			//AC2IDTest();
 			//AC2RewriteTest();
 			//Console.WriteLine(args.Length);
@@ -21,6 +32,39 @@ namespace ACSharpTests {
 			//if (!Directory.Exists(args[0])) return;
 			//string path = Path.Combine(args[0], "DataPC_Venezia.forge");
 			//if (File.Exists(path)) AC2RewriteTest(path);
+		}
+
+		static void AC2FileTypeTest() {
+			Dictionary<uint, string> hashes = new Dictionary<uint, string>();
+			foreach (string line in File.ReadAllLines(@"E:\Anna\Desktop\FORGEd.txt")) {
+				byte[] hashbytes = Encoding.ASCII.GetBytes(line);
+				uint hash = Crc32Algorithm.Compute(hashbytes, 0, hashbytes.Length);
+				if (!hashes.ContainsKey(hash)) hashes[hash] = line;
+				else Console.WriteLine($"COLLISION {line} - {hashes[hash]}");
+			}
+
+
+			Dictionary<uint, int> typeCounts = new Dictionary<uint, int>();
+			foreach(string path in Directory.EnumerateFiles(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II\", "*.forge")) {
+				//if (path.Contains("extra") || path.Contains("Firenze")) continue;
+
+				Forge f = new Forge(path, Games.AC2);
+				for (int i = 0; i < f.datafileTable.Length; i++) {
+					ForgeFile[] files = f.OpenDatafile(i, null, false);
+					if (files is null) {
+						Console.WriteLine(Path.GetFileName(path) + " " + f.datafileTable[i].name + " do not worky");
+						continue;
+					}
+					for (int file = 0; file < files.Length; file++) {
+						if (!typeCounts.ContainsKey(files[file].fileType)) typeCounts[files[file].fileType] = 1;
+						else typeCounts[files[file].fileType] += 1;
+					}
+				}
+			}
+			foreach (uint type in typeCounts.Keys) {
+				if(hashes.ContainsKey(type)) Console.WriteLine($"{hashes[type]}: {typeCounts[type]}");
+				else Console.WriteLine($"UNK{type}: {typeCounts[type]}");
+			}
 		}
 
 
