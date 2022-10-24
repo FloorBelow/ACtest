@@ -12,6 +12,16 @@ using Force.Crc32;
 namespace ACSharpTests {
 	class Program {
 		static void Main(string[] args) {
+			AC2FileTypeTest(); return;
+
+
+			HashSet<string> strings = new HashSet<string>();
+			FileTypeSearch(strings, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed 1\AssassinsCreed_Dx9.exe");
+			FileTypeSearch(strings, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed 1\AssassinsCreed_Dx10.exe");
+			FileTypeSearch(strings, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed 1\AssassinsCreed_Game.exe");
+			using (TextWriter w = new StreamWriter(File.Open("ac1_dump.txt", FileMode.Create)))
+				foreach (string s in strings) w.WriteLine(s);
+			return;
 
 			byte[] hashbytes = Encoding.ASCII.GetBytes("GridCellDataBlock");
 			uint hash = Crc32Algorithm.Compute(hashbytes, 0, hashbytes.Length);
@@ -34,9 +44,36 @@ namespace ACSharpTests {
 			//if (File.Exists(path)) AC2RewriteTest(path);
 		}
 
+		static void FileTypeSearch(HashSet<string> strings, string exe) {
+
+			HashSet<char> startchar = new HashSet<char>("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+			HashSet<char> continuechar = new HashSet<char>("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_");
+			Console.Write(Path.GetFileName(exe) + " ");
+
+			using(BinaryReader r = new BinaryReader(File.OpenRead(exe))) {
+				int complete = 0;
+				while(r.BaseStream.Position < r.BaseStream.Length - 1) {
+					byte b = r.ReadByte();
+					if(r.BaseStream.Position * 20 / r.BaseStream.Length > complete) { complete++; Console.Write($" {complete*5}"); }
+					if( startchar.Contains((char)b)) {
+						StringBuilder str = new StringBuilder();
+						str.Append((char)b);
+						b = r.ReadByte();
+						while(b != 0) {
+							if (!continuechar.Contains((char)b)) break;
+							str.Append((char)b);
+							b = r.ReadByte();
+                        }
+						if(str.Length > 3) strings.Add(str.ToString());
+                    }
+                }
+            }
+			Console.WriteLine();
+        }
+
 		static void AC2FileTypeTest() {
 			Dictionary<uint, string> hashes = new Dictionary<uint, string>();
-			foreach (string line in File.ReadAllLines(@"E:\Anna\Desktop\FORGEd.txt")) {
+			foreach (string line in File.ReadAllLines(@"E:\Anna\Desktop\FORGEf.txt")) {
 				byte[] hashbytes = Encoding.ASCII.GetBytes(line);
 				uint hash = Crc32Algorithm.Compute(hashbytes, 0, hashbytes.Length);
 				if (!hashes.ContainsKey(hash)) hashes[hash] = line;
@@ -45,14 +82,14 @@ namespace ACSharpTests {
 
 
 			Dictionary<uint, int> typeCounts = new Dictionary<uint, int>();
-			foreach(string path in Directory.EnumerateFiles(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II\", "*.forge")) {
+			foreach(string path in Directory.EnumerateFiles(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed 1\", "*.forge")) {
 				//if (path.Contains("extra") || path.Contains("Firenze")) continue;
 
-				Forge f = new Forge(path, Games.AC2);
+				Forge f = new Forge(path, Games.AC1);
 				for (int i = 0; i < f.datafileTable.Length; i++) {
 					ForgeFile[] files = f.OpenDatafile(i, null, false);
 					if (files is null) {
-						Console.WriteLine(Path.GetFileName(path) + " " + f.datafileTable[i].name + " do not worky");
+						//Console.WriteLine(Path.GetFileName(path) + " " + f.datafileTable[i].name + " do not worky");
 						continue;
 					}
 					for (int file = 0; file < files.Length; file++) {
