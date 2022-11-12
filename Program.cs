@@ -8,31 +8,90 @@ using ACSharp;
 using ACSharp.ResourceTypes;
 using System.IO;
 using Force.Crc32;
+using ImageMagick;
+using BCnEncoder;
 
 namespace ACSharpTests {
 	class Program {
 		static void Main(string[] args) {
-			AC2FileTypeTest(); return;
 
+			//ListFilesOfType("World", Game.AC1, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed 1");
+			//ListFilesOfType("World", Game.AC2, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II");
+			//ListFilesOfType("World", Game.AC2, @"F:\Games\Assassin's Creed Brotherhood");
+			//ListFilesOfType("World", Game.AC2, @"F:\Games\Assassin's Creed Revelations");
+			ListFilesOfType("World", Game.ACE, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed Odyssey");
+
+			//ListFilesOfType("World", Game.ACE, @"F:\Games\Assassin's Creed Origins");
+			return;
+
+			TerrainTest();
+			TerrainCompose(); return;
+			
+
+			int side = 1;
+			int count = 0;
+			for (int i = 0; i < 10; i++) {
+				count += (side * side);
+				Console.WriteLine($"{side} {count}");
+
+				side = side * 2;
+            }
+			//return;
+
+			/*
+			foreach(string path in Directory.EnumerateFiles(@"F:\Games\Assassin's Creed Origins\", "*.forge")) {
+				Forge f = new Forge(path, Game.ACE);
+				for (int i = 0; i < f.datafileTable.Length; i++) f.OpenDatafile(i);
+			}
+			*/
+
+			//Forge f = new Forge(@"F:\Games\Assassin's Creed Origins\DataPC_ACE_AegeanCoast.forge", Game.ACE);
+			//for(int i = 22412; i < 22413; i++) File.WriteAllBytes(f.datafileTable[i].name + ".stream", f.DecompressDatafile(i)); return;
+
+
+			//for (int i = 0; i < f.datafileTable.Length; i++) { Console.WriteLine(i); f.OpenDatafile(i); }
+
+
+			//AC2FileTypeTest(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II\"); return;
+
+			//AC2FileTypeTest(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II", Game.AC2); return;
+			Forge f = new Forge(@"F:\Games\Assassin's Creed Origins\DataPC_ACE_Egypt.forge", Game.ACE);
+			for(int stream = 0; stream < f.datafileTable.Length; stream++) {
+				ForgeFile[] files = f.OpenDatafile(stream, null, Forge.ReadResourceType.Raw);
+				if(files is null) {
+					Console.WriteLine("NULL - " + f.datafileTable[stream].name);
+					continue;
+                }
+				for(int file = 0; file < files.Length; file++) {
+					if(files[file].fileType == Util.FileType("TerrainNodeData")) {
+						Console.WriteLine(f.datafileTable[stream].name + " - " + files[file].name);
+						File.WriteAllBytes($"Terrain/{files[file].name}.TerrainNodeData.ace", ((ResourceRawData)files[file].resource).data);
+					}
+                }
+            }
+
+			return;
+
+			AC2FileTypeTest(@"F:\Games\Assassin's Creed Origins", Game.ACE); return;
+
+			AC2FileTypeTest(@"F:\Games\Assassin's Creed Brotherhood\");
+			AC2FileTypeTest(@"F:\Games\Assassin's Creed Revelations\"); return;
+			
 
 			HashSet<string> strings = new HashSet<string>();
-			FileTypeSearch(strings, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed 1\AssassinsCreed_Dx9.exe");
-			FileTypeSearch(strings, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed 1\AssassinsCreed_Dx10.exe");
-			FileTypeSearch(strings, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed 1\AssassinsCreed_Game.exe");
-			using (TextWriter w = new StreamWriter(File.Open("ac1_dump.txt", FileMode.Create)))
+			FileTypeSearch(strings, @"F:\Games\Assassin's Creed Revelations\ACRSP.exe");
+			FileTypeSearch(strings, @"F:\Games\Assassin's Creed Revelations\ACRMP.exe");
+			FileTypeSearch(strings, @"F:\Games\Assassin's Creed Revelations\ACRPR.exe");
+			FileTypeSearch(strings, @"F:\Games\Assassin's Creed Revelations\AssassinsCreedRevelations.exe");
+			using (TextWriter w = new StreamWriter(File.Open("acfe_dump.txt", FileMode.Create)))
 				foreach (string s in strings) w.WriteLine(s);
 			return;
 
-			byte[] hashbytes = Encoding.ASCII.GetBytes("GridCellDataBlock");
-			uint hash = Crc32Algorithm.Compute(hashbytes, 0, hashbytes.Length);
-			Console.WriteLine(hash);
-
-			hashbytes = Encoding.ASCII.GetBytes("DataBlock");
-			hash = Crc32Algorithm.Compute(hashbytes, 0, hashbytes.Length);
-			Console.WriteLine(hash);
 
 			//AC2FileTypeTest();
-			//Forge f = new Forge(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II\DataPC_Toscana.forge", Games.AC2);
+			//Forge f = new Forge(@"F:\Games\Assassin's Creed Brotherhood\DataPC_ACR_Rome.forge", Games.AC2);
+			//for (int i = 0; i < f.datafileTable.Length; i++) f.OpenDatafile(i, null, Forge.ReadResourceType.Empty);
+
 			//Console.WriteLine(f.datafileTable[0].name);
 			//AC2IDTest();
 			//AC2RewriteTest();
@@ -44,55 +103,175 @@ namespace ACSharpTests {
 			//if (File.Exists(path)) AC2RewriteTest(path);
 		}
 
+		static void TerrainCompose() {
+
+			int tileSize = 128;
+
+			int start = 1365;
+			int end = 5460;
+
+			MagickImageCollection montage = new MagickImageCollection();
+			MontageSettings montageSettings = new MontageSettings() { Geometry = new MagickGeometry(tileSize, tileSize), TileGeometry = new MagickGeometry(64, 64), BackgroundColor = MagickColors.Transparent };
+
+			for(int y = 0; y < 64; y++) {
+				for(int x = 0; x < 64; x++) {
+					int searchNum = start + x + (63 - y) * 64;
+					MagickImage image = new MagickImage($@"F:\BACKUP\Code\ACSharpTests\bin\x64\Debug\TerrainNormal\TerrainNodeData_00{searchNum}.TerrainNodeData.png");
+					image.Alpha(AlphaOption.Opaque);
+					//image.Flip();
+					montage.Add(image);
+                }
+				Console.WriteLine(y);
+            }
+
+			var output = montage.Montage(montageSettings);
+			Console.WriteLine(output.Width);
+			output.Write("TerrainNormal.tga");
+
+			
+        }
+
+		static void TerrainTest() {
+			int iterator = 0;
+			foreach(string path in Directory.EnumerateFiles(@"F:\BACKUP\Code\ACSharpTests\bin\x64\Debug\Terrain", "*.TerrainNodeData.ace")) {
+				iterator++; if (iterator >= 5461) break;
+				BinaryReader reader = new BinaryReader(File.OpenRead(path));
+				reader.Seek(12); //TerrainNodeData
+				uint terrainNodeIndex = reader.ReadUInt32();
+				float unkA = reader.ReadSingle();
+				float unkB = reader.ReadSingle();
+				reader.Seek(12); //NodeHeightMapScaleOffset
+				byte scale = reader.ReadByte();
+				byte offset = reader.ReadByte();
+				ushort unkC = reader.ReadUInt16();
+
+				for (int terrainSplattingField = 0; terrainSplattingField < 2; terrainSplattingField++) {
+					reader.Seek(12); //TerrainSplattingField
+					reader.Seek(32); //data
+				}
+
+
+				int max = ushort.MinValue;
+				int min = ushort.MaxValue;
+
+				uint array1Size = reader.ReadUInt32();
+				ushort[] array1 = new ushort[array1Size / 2];
+				for (int i = 0; i < array1.Length; i++) {
+					array1[i] = (ushort)(reader.ReadUInt16() / (1 << scale) + offset * 256);
+					if (array1[i] > max) max = array1[i];
+					if (array1[i] < min) min = array1[i];
+				}
+
+				int array2Size = reader.ReadInt32();
+				byte[] array2 = reader.ReadBytes(array2Size);
+
+				//BCnEncoder.Decoder.BcDecoder decoder = new BCnEncoder.Decoder.BcDecoder();
+				//byte[] decoded = decoder.DecodeRawData(array2, 132, 132, BCnEncoder.Shared.CompressionFormat.BC3);
+				//for (int i = 0; i < decoded.Length; i += 4) {
+				//	decoded[i + 3] = 255;
+				//}
+
+				int array3Size = reader.ReadInt32();
+				byte[] array3 = reader.ReadBytes(array3Size);
+				BCnEncoder.Decoder.BcDecoder decoder = new BCnEncoder.Decoder.BcDecoder();
+				byte[] decoded = decoder.DecodeRawData(array3, 132, 132, BCnEncoder.Shared.CompressionFormat.BC3);
+
+
+				//int array4Size = reader.ReadInt32();
+				//byte[] array4 = reader.ReadBytes(array4Size);
+
+				//for (int i = 0; i < 32; i++) Console.WriteLine(array2[i]);
+				//return;
+
+				//Console.WriteLine($"{Path.GetFileNameWithoutExtension(path)} MIN:{min} MAX:{max}");
+
+				//byte[] array1bytes = new byte[array1.Length * 2];
+				//Buffer.BlockCopy(array1, 0, array1bytes, 0, array1bytes.Length);
+
+
+
+				PixelReadSettings pixelSettings = new PixelReadSettings(132, 132, StorageType.Char, PixelMapping.RGBA);
+				MagickImage image = new MagickImage();
+				image.ReadPixels(decoded, pixelSettings);
+				image.Crop(new MagickGeometry(2, 2, 128, 128));
+				image.Flip();
+				image.Write($@"TerrainNormal/{Path.GetFileNameWithoutExtension(path)}.png");
+				//return;
+
+			}
+			
+
+		}
+
 		static void FileTypeSearch(HashSet<string> strings, string exe) {
 
 			HashSet<char> startchar = new HashSet<char>("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-			HashSet<char> continuechar = new HashSet<char>("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_");
+			HashSet<char> continuechar = new HashSet<char>("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_.-/&");
 			Console.Write(Path.GetFileName(exe) + " ");
 
-			using(BinaryReader r = new BinaryReader(File.OpenRead(exe))) {
+			using (BinaryReader r = new BinaryReader(File.OpenRead(exe))) {
 				int complete = 0;
-				while(r.BaseStream.Position < r.BaseStream.Length - 1) {
+				while (r.BaseStream.Position < r.BaseStream.Length - 1) {
 					byte b = r.ReadByte();
-					if(r.BaseStream.Position * 20 / r.BaseStream.Length > complete) { complete++; Console.Write($" {complete*5}"); }
-					if( startchar.Contains((char)b)) {
+					if (r.BaseStream.Position * 20 / r.BaseStream.Length > complete) { complete++; Console.Write($" {complete * 5}"); }
+					if (startchar.Contains((char)b)) {
 						StringBuilder str = new StringBuilder();
 						str.Append((char)b);
 						b = r.ReadByte();
-						while(b != 0) {
+						while (b != 0) {
 							if (!continuechar.Contains((char)b)) break;
 							str.Append((char)b);
 							b = r.ReadByte();
-                        }
-						if(str.Length > 3) strings.Add(str.ToString());
+						}
+						if (str.Length >= 3) strings.Add(str.ToString());
+					}
+				}
+			}
+			Console.WriteLine();
+		}
+
+		static void ListFilesOfType(string typeName, Game game, string folder) {
+			uint type = Util.FileType(typeName);
+			foreach (string path in Directory.EnumerateFiles(folder, "*.forge", SearchOption.AllDirectories)) {
+				Forge f = new Forge(path, game);
+				for(int stream = 0; stream < f.datafileTable.Length; stream++) {
+					var files = f.OpenDatafile(stream, null, Forge.ReadResourceType.Empty);
+					if (files is null) continue;
+					for(int file = 0; file < files.Length; file++) {
+						if (files[file].fileType == type) Console.WriteLine(files[file].name);
                     }
                 }
-            }
-			Console.WriteLine();
-        }
+			}
+		}
 
-		static void AC2FileTypeTest() {
+		static void AC2FileTypeTest(string folder, Game game = Game.AC2) {
+			bool collison = false;
 			Dictionary<uint, string> hashes = new Dictionary<uint, string>();
-			foreach (string line in File.ReadAllLines(@"E:\Anna\Desktop\FORGEf.txt")) {
+			foreach (string line in File.ReadAllLines(@"F:\Anna\Desktop\FORGEi.txt")) {
 				byte[] hashbytes = Encoding.ASCII.GetBytes(line);
 				uint hash = Crc32Algorithm.Compute(hashbytes, 0, hashbytes.Length);
 				if (!hashes.ContainsKey(hash)) hashes[hash] = line;
-				else Console.WriteLine($"COLLISION {line} - {hashes[hash]}");
+				else {
+					Console.WriteLine($"COLLISION {line} - {hashes[hash]}");
+					collison = true;
+				}
 			}
-
+			if(collison) return;
 
 			Dictionary<uint, int> typeCounts = new Dictionary<uint, int>();
-			foreach(string path in Directory.EnumerateFiles(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed 1\", "*.forge")) {
+			foreach(string path in Directory.EnumerateFiles(folder, "*.forge")) {
+			//foreach (string path in Directory.EnumerateFiles(, "*.forge")) {
 				//if (path.Contains("extra") || path.Contains("Firenze")) continue;
 
-				Forge f = new Forge(path, Games.AC1);
+				Forge f = new Forge(path, game);
 				for (int i = 0; i < f.datafileTable.Length; i++) {
-					ForgeFile[] files = f.OpenDatafile(i, null, false);
+					ForgeFile[] files = f.OpenDatafile(i, null, Forge.ReadResourceType.Empty);
 					if (files is null) {
 						//Console.WriteLine(Path.GetFileName(path) + " " + f.datafileTable[i].name + " do not worky");
 						continue;
 					}
 					for (int file = 0; file < files.Length; file++) {
+						if (files[file].fileType == Util.FileType("TerrainNodeData")) Console.WriteLine($"{f.datafileTable[i].name} - {file}  - {files[file].name}");
 						if (!typeCounts.ContainsKey(files[file].fileType)) typeCounts[files[file].fileType] = 1;
 						else typeCounts[files[file].fileType] += 1;
 					}
@@ -106,9 +285,9 @@ namespace ACSharpTests {
 
 
 		static void AC2IDTest() {
-			Dictionary<uint, ForgeFile> fileDict = new Dictionary<uint, ForgeFile>();
+			Dictionary<ulong, ForgeFile> fileDict = new Dictionary<ulong, ForgeFile>();
 			foreach (string forgePath in Directory.EnumerateFiles(@"F:\Games\Assassin's Creed II\", "*.forge")) {
-				Forge f = new Forge(forgePath, Games.AC2);
+				Forge f = new Forge(forgePath, Game.AC2);
 				for (int i = 0; i < f.datafileTable.Length; i++) f.OpenDatafile(i, fileDict);
 			}
 			StreamWriter writer = new StreamWriter(File.Open("IDLIST.txt", FileMode.Create));
@@ -124,7 +303,7 @@ namespace ACSharpTests {
 			//for (int i = 0; i < f.datafileTable.Length; i++) f.OpenDatafile(i, fileDict);
 			//for (int i = 0; i < f2.datafileTable.Length; i++) f2.OpenDatafile(i, fileDict);
 		}
-
+		/*
 		static void AC2UnlockCemetery(string path = @"F:\Games\Assassin's Creed II\DataPC_Venezia.forge") {
 			Forge f = new Forge(path, Games.AC2);
 
@@ -271,9 +450,10 @@ namespace ACSharpTests {
 
 			Console.WriteLine(uncompressedData.Length);
 			f.RewriteDatafile(412, uncompressedData);
-			*/
+			
 			//File.WriteAllBytes($"{ f.datafileTable[412].name}.data", uncompressedData);
 		}
+			*/
 
 		static void SaveDatafile(Forge f, string start) {
 			int i = f.IndexOf(start);
@@ -282,7 +462,7 @@ namespace ACSharpTests {
 		}
 
 		static void AC2Test2() {
-			Forge f = new Forge(@"F:\Games\Assassin's Creed II\DataPC_Toscana.forge", Games.AC2);
+			Forge f = new Forge(@"F:\Games\Assassin's Creed II\DataPC_Toscana.forge", Game.AC2);
 			SaveDatafile(f, "Cell00626");
 			//Dictionary<uint, ForgeFile> fileDict = new Dictionary<uint, ForgeFile>();
 			//for (int i = 0; i < f.datafileTable.Length; i++) f.OpenDatafile(i, fileDict);
@@ -297,7 +477,7 @@ namespace ACSharpTests {
 		}
 
 		static void AC2Tests() {
-			Forge f = new Forge(@"F:\Games\Assassin's Creed II\DataPC_Toscana.forge", Games.AC2);
+			Forge f = new Forge(@"F:\Games\Assassin's Creed II\DataPC_Toscana.forge", Game.AC2);
 			ForgeFile[] files = f.OpenDatafile(2);
 			for (int i = 0; i < files.Length; i++) {
 				if (files[i].fileType == Mesh.id) {
@@ -316,14 +496,14 @@ namespace ACSharpTests {
 
 		static void NewEntityTest() {
 			Forge f = new Forge(@"F:\Games\Assassin's Creed 1\DataPC_Damascus.forge");
-			Dictionary<uint, ForgeFile> fileDict = new Dictionary<uint, ForgeFile>();
+			Dictionary<ulong, ForgeFile> fileDict = new Dictionary<ulong, ForgeFile>();
 			for (int i = 0; i < f.datafileTable.Length; i++) f.OpenDatafile(i, fileDict);
 			//foreach (ForgeFile file in fileDict.Values) {
 			//	if (file.fileType != Entity.id) continue;
 			//	Console.WriteLine($"{file.name}: {((Entity)file.resource).entities.Count}");
 			//}
 		}
-
+		/*
 		static void ExportTestsNew() {
 			Forge f = new Forge(@"F:\Games\Assassin's Creed 1\DataPC_Damascus.forge");
 			ForgeFile[] files = f.OpenDatafile(233);
@@ -338,6 +518,7 @@ namespace ACSharpTests {
 				}
 			}
 		}
+		*/
 
 		static void ExportTests() {
 			Forge f = new Forge(@"F:\Games\Assassin's Creed 1\DataPC_Damascus.forge");
@@ -361,13 +542,13 @@ namespace ACSharpTests {
 
 		static void PackTests() {
 			Forge f = new Forge(@"F:\Games\Assassin's Creed 1\DataPC.forge");
-			Dictionary<uint, ForgeFile> fileDict = new Dictionary<uint, ForgeFile>();
+			Dictionary<ulong, ForgeFile> fileDict = new Dictionary<ulong, ForgeFile>();
 			for (int i = 0; i < f.datafileTable.Length; i++) f.OpenDatafile(i, fileDict);
 		}
 
 		static void EntityGroupTest() {
 			Forge f = new Forge(@"F:\Games\Assassin's Creed 1\DataPC_Jerusalem.forge");
-			Dictionary<uint, ForgeFile> fileDict = new Dictionary<uint, ForgeFile>();
+			Dictionary<ulong, ForgeFile> fileDict = new Dictionary<ulong, ForgeFile>();
 			for (int i = 0; i < f.datafileTable.Length; i++) f.OpenDatafile(i, fileDict);
 			foreach (ForgeFile file in fileDict.Values) {
 				if (file.fileType != EntityGroup.id) continue;
@@ -377,7 +558,7 @@ namespace ACSharpTests {
 
 		static void MeshTest() {
 			Forge f = new Forge(@"F:\Games\Assassin's Creed 1\DataPC_Jerusalem.forge");
-			Dictionary<uint, ForgeFile> fileDict = new Dictionary<uint, ForgeFile>();
+			Dictionary<ulong, ForgeFile> fileDict = new Dictionary<ulong, ForgeFile>();
 			for (int i = 0; i < f.datafileTable.Length; i++) f.OpenDatafile(i, fileDict);
 			foreach (ForgeFile file in fileDict.Values) {
 				if (file.fileType != Mesh.id) continue;
@@ -394,7 +575,7 @@ namespace ACSharpTests {
 
 		static void DataBlockTest() {
 			Forge f = new Forge(@"F:\Games\Assassin's Creed 1\DataPC_SolomonTemple.forge");
-			Dictionary<uint, ForgeFile> fileDict = new Dictionary<uint, ForgeFile>();
+			Dictionary<ulong, ForgeFile> fileDict = new Dictionary<ulong, ForgeFile>();
 			for (int i = 0; i < f.datafileTable.Length; i++) f.OpenDatafile(i, fileDict);
 			foreach (ForgeFile file in fileDict.Values) {
 				if (file.fileType != DataBlock.id) continue;
