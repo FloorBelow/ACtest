@@ -14,19 +14,43 @@ using BCnEncoder;
 namespace ACSharpTests {
 	class Program {
 		static void Main(string[] args) {
+			//TerrainCompose2(@"F:\Extracted\AC\ACE\DataPC_ACE_Egypt_ext_assets");
+			//return;
 
+
+			//TerrainCompose2(@"F:\Extracted\AC\ACE\DataPC_ACE_DLC_RedSea"); return;
+			//TerrainTest2(); return;
+
+			foreach (string forgepath in Directory.EnumerateFiles(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed Odyssey", "*.forge", SearchOption.AllDirectories)) {
+				Forge f = new Forge(forgepath, Game.ACE);
+				for (int stream = 0; stream < f.datafileTable.Length; stream++) {
+					ForgeFile[] files = f.OpenDatafile(stream, null, Forge.ReadResourceType.Raw);
+					if (files is null) {
+						Console.WriteLine("NULL - " + f.datafileTable[stream].name);
+						continue;
+					}
+					for (int file = 0; file < files.Length; file++) {
+						if (files[file].fileType == Util.FileType("TerrainNodeData")) {
+							Console.WriteLine(f.datafileTable[stream].name + " - " + files[file].name);
+							string folder = $@"F:\Extracted\AC\ACD\{f.name}";
+							if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+							File.WriteAllBytes(Path.Combine(folder, $"{files[file].name}.TerrainNodeData.ace"), ((ResourceRawData)files[file].resource).data);
+						}
+					}
+				}
+			}
+			return;
 			//ListFilesOfType("World", Game.AC1, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed 1");
 			//ListFilesOfType("World", Game.AC2, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II");
 			//ListFilesOfType("World", Game.AC2, @"F:\Games\Assassin's Creed Brotherhood");
 			//ListFilesOfType("World", Game.AC2, @"F:\Games\Assassin's Creed Revelations");
-			ListFilesOfType("World", Game.ACE, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed Odyssey");
+			//ListFilesOfType("World", Game.ACE, @"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed Odyssey");
 
 			//ListFilesOfType("World", Game.ACE, @"F:\Games\Assassin's Creed Origins");
-			return;
+			//return;
 
-			TerrainTest();
-			TerrainCompose(); return;
 			
+			TerrainCompose(); return;
 
 			int side = 1;
 			int count = 0;
@@ -55,22 +79,6 @@ namespace ACSharpTests {
 			//AC2FileTypeTest(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II\"); return;
 
 			//AC2FileTypeTest(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II", Game.AC2); return;
-			Forge f = new Forge(@"F:\Games\Assassin's Creed Origins\DataPC_ACE_Egypt.forge", Game.ACE);
-			for(int stream = 0; stream < f.datafileTable.Length; stream++) {
-				ForgeFile[] files = f.OpenDatafile(stream, null, Forge.ReadResourceType.Raw);
-				if(files is null) {
-					Console.WriteLine("NULL - " + f.datafileTable[stream].name);
-					continue;
-                }
-				for(int file = 0; file < files.Length; file++) {
-					if(files[file].fileType == Util.FileType("TerrainNodeData")) {
-						Console.WriteLine(f.datafileTable[stream].name + " - " + files[file].name);
-						File.WriteAllBytes($"Terrain/{files[file].name}.TerrainNodeData.ace", ((ResourceRawData)files[file].resource).data);
-					}
-                }
-            }
-
-			return;
 
 			AC2FileTypeTest(@"F:\Games\Assassin's Creed Origins", Game.ACE); return;
 
@@ -113,6 +121,7 @@ namespace ACSharpTests {
 			MagickImageCollection montage = new MagickImageCollection();
 			MontageSettings montageSettings = new MontageSettings() { Geometry = new MagickGeometry(tileSize, tileSize), TileGeometry = new MagickGeometry(64, 64), BackgroundColor = MagickColors.Transparent };
 
+
 			for(int y = 0; y < 64; y++) {
 				for(int x = 0; x < 64; x++) {
 					int searchNum = start + x + (63 - y) * 64;
@@ -131,10 +140,62 @@ namespace ACSharpTests {
 			
         }
 
+		static void TerrainCompose2(string path) {
+			Console.WriteLine(path);
+			int tileSize = 128;
+
+			int edgeSize = 1;
+			int start = 0;
+			for(int i = 0; i < 9; i++) {
+				Console.Write(edgeSize * tileSize);
+				if (i < 8) goto Test;
+				bool exists = false;
+				//MontageSettings montageSettings = new MontageSettings() { Geometry = new MagickGeometry(tileSize, tileSize), TileGeometry = new MagickGeometry(edgeSize, edgeSize), BackgroundColor = MagickColors.Transparent };
+				//MagickImageCollection montage = new MagickImageCollection();
+				MagickImage montage = new MagickImage(MagickColors.Transparent, tileSize * edgeSize, tileSize * edgeSize);
+
+
+				for (int y = 0; y < edgeSize; y++) {
+					for (int x = 0; x < edgeSize; x++) {
+						int searchNum = start + x + (edgeSize - y - 1) * edgeSize;
+						string tilePath = Path.Combine(path, string.Format("Diffuse\\TerrainNodeData_{0:D6}_D.png", searchNum));
+						if (File.Exists(tilePath)) {
+							exists = true;
+							MagickImage image = new MagickImage(tilePath);
+							image.Alpha(AlphaOption.Opaque);
+							montage.Composite(image, x * tileSize, y * tileSize, CompositeOperator.Over);
+						}
+					}
+					Console.Write($" {y + 1}");
+				}
+
+				if (exists) {
+					Console.Write(" montaged");
+					montage.Quality = 0;
+					montage.Write(Path.Combine(path, $"Diffuse\\combined_{edgeSize * tileSize}.png"));
+					Console.Write(" written.");
+
+
+
+				} else {
+					Console.Write($" does not exist.");
+					//break;
+				}
+				Test:
+				start += edgeSize * edgeSize;
+				edgeSize *= 2;
+				Console.WriteLine();
+			}
+
+		}
+
 		static void TerrainTest() {
-			int iterator = 0;
-			foreach(string path in Directory.EnumerateFiles(@"F:\BACKUP\Code\ACSharpTests\bin\x64\Debug\Terrain", "*.TerrainNodeData.ace")) {
-				iterator++; if (iterator >= 5461) break;
+
+			BCnEncoder.Decoder.BcDecoder decoder = new BCnEncoder.Decoder.BcDecoder();
+
+
+			foreach (string path in Directory.EnumerateFiles(@"F:\Extracted\Ubisoft\ACE\", "*.TerrainNodeData.ace", SearchOption.AllDirectories)) {
+				//iterator++; if (iterator >= 5461) break;
 				BinaryReader reader = new BinaryReader(File.OpenRead(path));
 				reader.Seek(12); //TerrainNodeData
 				uint terrainNodeIndex = reader.ReadUInt32();
@@ -162,8 +223,33 @@ namespace ACSharpTests {
 					if (array1[i] < min) min = array1[i];
 				}
 
-				int array2Size = reader.ReadInt32();
-				byte[] array2 = reader.ReadBytes(array2Size);
+
+
+				int diffuseTexSize = reader.ReadInt32(); if (diffuseTexSize != 17424) Console.WriteLine("Unknown diffuse size");
+				byte[] diffuseTex = decoder.DecodeRawData(reader.ReadBytes(diffuseTexSize), 132, 132, BCnEncoder.Shared.CompressionFormat.BC3);
+
+				int normalTexSize = reader.ReadInt32(); if (normalTexSize != 17424) Console.WriteLine("Unknown normal size");
+				byte[] normalTex = decoder.DecodeRawData(reader.ReadBytes(normalTexSize), 132, 132, BCnEncoder.Shared.CompressionFormat.BC3);
+
+				PixelReadSettings pixelSettings = new PixelReadSettings(132, 132, StorageType.Char, PixelMapping.RGBA);
+
+				string diffuseFolder = Path.Combine(Path.GetDirectoryName(path), "Diffuse"); if (!Directory.Exists(diffuseFolder)) Directory.CreateDirectory(diffuseFolder);
+				string normalFolder = Path.Combine(Path.GetDirectoryName(path), "Normal"); if (!Directory.Exists(normalFolder)) Directory.CreateDirectory(normalFolder);
+
+
+				Console.WriteLine(path);
+
+				MagickImage diffuse = new MagickImage();
+				diffuse.ReadPixels(diffuseTex, pixelSettings);
+				diffuse.Crop(new MagickGeometry(2, 2, 128, 128));
+				diffuse.Flip();
+				diffuse.Write(Path.Combine(diffuseFolder, Path.GetFileName(path).Replace(".TerrainNodeData.ace", "_D.png")));
+
+				MagickImage normal = new MagickImage();
+				normal.ReadPixels(normalTex, pixelSettings);
+				normal.Crop(new MagickGeometry(2, 2, 128, 128));
+				normal.Flip();
+				normal.Write(Path.Combine(normalFolder, Path.GetFileName(path).Replace(".TerrainNodeData.ace", "_N.png")));
 
 				//BCnEncoder.Decoder.BcDecoder decoder = new BCnEncoder.Decoder.BcDecoder();
 				//byte[] decoded = decoder.DecodeRawData(array2, 132, 132, BCnEncoder.Shared.CompressionFormat.BC3);
@@ -171,10 +257,6 @@ namespace ACSharpTests {
 				//	decoded[i + 3] = 255;
 				//}
 
-				int array3Size = reader.ReadInt32();
-				byte[] array3 = reader.ReadBytes(array3Size);
-				BCnEncoder.Decoder.BcDecoder decoder = new BCnEncoder.Decoder.BcDecoder();
-				byte[] decoded = decoder.DecodeRawData(array3, 132, 132, BCnEncoder.Shared.CompressionFormat.BC3);
 
 
 				//int array4Size = reader.ReadInt32();
@@ -190,18 +272,92 @@ namespace ACSharpTests {
 
 
 
-				PixelReadSettings pixelSettings = new PixelReadSettings(132, 132, StorageType.Char, PixelMapping.RGBA);
-				MagickImage image = new MagickImage();
-				image.ReadPixels(decoded, pixelSettings);
-				image.Crop(new MagickGeometry(2, 2, 128, 128));
-				image.Flip();
-				image.Write($@"TerrainNormal/{Path.GetFileNameWithoutExtension(path)}.png");
 				//return;
 
 			}
-			
+
 
 		}
+
+		static void TerrainTest2() {
+
+			BCnEncoder.Decoder.BcDecoder decoder = new BCnEncoder.Decoder.BcDecoder();
+			PixelReadSettings pixelSettings = new PixelReadSettings(132, 132, StorageType.Char, PixelMapping.RGBA);
+
+
+			Action<object> action = (object obj) => {
+				string path = (string)obj;
+				BinaryReader reader = new BinaryReader(File.OpenRead(path));
+				reader.Seek(12); //TerrainNodeData
+				uint terrainNodeIndex = reader.ReadUInt32();
+				float unkA = reader.ReadSingle();
+				float unkB = reader.ReadSingle();
+				reader.Seek(12); //NodeHeightMapScaleOffset
+				byte scale = reader.ReadByte();
+				byte offset = reader.ReadByte();
+				ushort unkC = reader.ReadUInt16();
+
+				for (int terrainSplattingField = 0; terrainSplattingField < 2; terrainSplattingField++) {
+					reader.Seek(12); //TerrainSplattingField
+					reader.Seek(32); //data
+				}
+
+
+				//int max = ushort.MinValue;
+				//int min = ushort.MaxValue;
+
+				uint array1Size = reader.ReadUInt32();
+				ushort[] array1 = new ushort[array1Size / 2];
+				for (int i = 0; i < array1.Length; i++) {
+					array1[i] = (ushort)(reader.ReadUInt16() / (1 << scale) + offset * 256);
+					//if (array1[i] > max) max = array1[i];
+					//if (array1[i] < min) min = array1[i];
+				}
+
+
+
+				int diffuseTexSize = reader.ReadInt32(); if (diffuseTexSize != 17424) Console.WriteLine("Unknown diffuse size");
+				byte[] diffuseTex = decoder.DecodeRawData(reader.ReadBytes(diffuseTexSize), 132, 132, BCnEncoder.Shared.CompressionFormat.BC3);
+
+				int normalTexSize = reader.ReadInt32(); if (normalTexSize != 17424) Console.WriteLine("Unknown normal size");
+				byte[] normalTex = decoder.DecodeRawData(reader.ReadBytes(normalTexSize), 132, 132, BCnEncoder.Shared.CompressionFormat.BC3);
+
+
+				string diffuseFolder = Path.Combine(Path.GetDirectoryName(path), "Diffuse"); if (!Directory.Exists(diffuseFolder)) Directory.CreateDirectory(diffuseFolder);
+				string normalFolder = Path.Combine(Path.GetDirectoryName(path), "Normal"); if (!Directory.Exists(normalFolder)) Directory.CreateDirectory(normalFolder);
+
+
+
+				MagickImage diffuse = new MagickImage();
+				diffuse.ReadPixels(diffuseTex, pixelSettings);
+				diffuse.Crop(new MagickGeometry(2, 2, 128, 128));
+				diffuse.Flip();
+				diffuse.Write(Path.Combine(diffuseFolder, Path.GetFileName(path).Replace(".TerrainNodeData.ace", "_D.png")));
+
+				MagickImage normal = new MagickImage();
+				normal.ReadPixels(normalTex, pixelSettings);
+				normal.Crop(new MagickGeometry(2, 2, 128, 128));
+				normal.Flip();
+				normal.Write(Path.Combine(normalFolder, Path.GetFileName(path).Replace(".TerrainNodeData.ace", "_N.png")));
+
+				Console.WriteLine(path);
+			};
+
+
+			string[] files = Directory.EnumerateFiles(@"F:\Extracted\Ubisoft\ACE\", "*.TerrainNodeData.ace", SearchOption.AllDirectories).ToArray();
+			Task[] tasks = new Task[files.Length]; for (int i = 0; i < files.Length; i++) tasks[i] = Task.Factory.StartNew(action, files[i]);
+			try {
+				Task.WaitAll(tasks);
+			} catch (AggregateException ae) {
+				Console.WriteLine("One or more exceptions occurred: ");
+				foreach (var ex in ae.Flatten().InnerExceptions)
+					Console.WriteLine("   {0}", ex.Message);
+			}
+		}
+
+		static void ExtractTerrainTextures() {
+
+        }
 
 		static void FileTypeSearch(HashSet<string> strings, string exe) {
 
